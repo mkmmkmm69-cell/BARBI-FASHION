@@ -1,0 +1,37 @@
+name: Build APK
+on: workflow_dispatch
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: women_store
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: women_store.zip
+          sparse-checkout-cone-mode: false
+      - name: Unzip
+        working-directory: .
+        run: unzip -q women_store.zip
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter create . --platforms=android --project-name women_store --org com.store
+      - name: Harden Android
+        run: |
+          for f in android/app/build.gradle android/app/build.gradle.kts; do
+            [ -f "$f" ] && sed -i -E 's/minSdk(Version)?( =)? *flutter\.minSdkVersion/minSdk\1\2 23/' "$f"
+          done
+          sed -i 's/<application/<application android:allowBackup="false" android:label="متجر الأزياء"/' android/app/src/main/AndroidManifest.xml
+          sed -i 's/android:label="women_store"//' android/app/src/main/AndroidManifest.xml
+      - run: flutter pub get
+      - run: flutter build apk --release --obfuscate --split-debug-info=build/symbols
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: women_store/build/app/outputs/flutter-apk/app-release.apk
